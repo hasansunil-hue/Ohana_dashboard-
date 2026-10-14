@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Printable Lamp Shade Studio</title>
+  <style>
+    :root {
+      --bg: #121316;
+      --panel: #1e2026;
+      --text: #e8eaed;
+      --muted: #9aa0a6;
+      --accent: #f59e0b;
+      --accent-hover: #d97706;
+      --border: #2e313a;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background: var(--bg); color: var(--text); display: flex; height: 100vh; overflow: hidden; }
+    
+    /* Sidebar UI */
+    #sidebar {
+      width: 360px;
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      z-index: 10;
+    }
+    header {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    header h1 { font-size: 1.1rem; font-weight: 700; color: var(--accent); letter-spacing: 0.3px; }
+    header span { font-size: 0.75rem; background: #2e313a; padding: 3px 8px; border-radius: 4px; color: var(--muted); }
+    
+    .controls {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .section-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      font-weight: 700;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+      margin-bottom: 4px;
+    }
+    .control-group { display: flex; flex-direction: column; gap: 6px; }
+    .control-header { display: flex; justify-content: space-between; font-size: 0.85rem; }
+    .val-badge { color: var(--accent); font-weight: 600; font-variant-numeric: tabular-nums; }
+    
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 6px;
+      background: #2e313a;
+      border-radius: 3px;
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+    }
+    select {
+      background: #282b33;
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      outline: none;
+    }
+    .toggle-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+      padding: 4px 0;
+    }
+    input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+
+    footer {
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+      background: var(--panel);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .btn {
+      background: var(--accent);
+      color: #121316;
+      border: none;
+      padding: 12px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: background 0.15s;
+      text-align: center;
+    }
+    .btn:hover { background: var(--accent-hover); }
+    .stats { font-size: 0.75rem; color: var(--muted); text-align: center; }
+
+    /* Viewport */
+    #viewport { flex: 1; position: relative; }
+    #overlay {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: rgba(30, 32, 38, 0.85);
+      backdrop-filter: blur(6px);
+      border: 1px solid var(--border);
+      padding: 10px 14px;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 0.8rem;
+    }
+  </style>
+
+  <!-- Import Three.js and Addons via CDN -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+
+  <aside id="sidebar">
+    <header>
+      <h1>LampShade Studio</h1>
+      <span>Units: mm</span>
+    </header>
+
+    <div class="controls">
+      <!-- Dimensions -->
+      <div class="section-title">1. Base Dimensions (mm)</div>
+      
+      <div class="control-group">
+        <div class="control-header"><label>Height</label><span id="v-height" class="val-badge">180 mm</span></div>
+        <input type="range" id="height" min="60" max="300" step="1" value="180">
+      </div>
+
+      <div class="control-group">
+        <div class="control-header"><label>Bottom Radius</label><span id="v-rBot" class="val-badge">70 mm</span></div>
+        <input type="range" id="rBot" min="25" max="150" step="1" value="70">
+      </div>
+
+      <div class="control-group">
+        <div class="control-header"><label>Top Radius</label><span id="v-rTop" class="val-badge">45 mm</span></div>
+        <input type="range" id="rTop" min="20" max="150" step="1" value="45">
+      </div>
+
+      <!-- Silhouette Curve -->
+      <div class="section-title">2. Silhouette Profile</div>
+
+      <div class="control-group">
+        <div class="control-header"><label>Profile Shape</label></div>
+        <select id="profileType">
+          <option value="bulge">Sinusoidal Bulge / Waist</option>
+          <option value="bell">Classic Bell / S-Curve</option>
+          <option value="hourglass">Hourglass Harmonic</option>
+          <option value="teardrop">Organic Teardrop</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <div class="control-header"><label>Curve Intensity</label><span id="v-curveAmp" class="val-badge">20 mm</span></div>
+        <input type="range" id="curveAmp" min="-50" max="60" step="1" value="20">
+      </div>
+
+      <!-- Surface Pattern -->
+      <div class="section-title">3. Surface Ribs & Twist</div>
+
+      <div class="control-group">
+        <div class="control-header"><label>Wave / Rib Style</label></div>
+        <select id="waveStyle">
+          <option value="sine">Smooth Sine Ribs</option>
+          <option value="pleated">Sharp Pleats (Origami)</option>
+          <option value="knurled">Diamond Cross-Ribbing</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <div class="control-header"><label>Rib Count</label><span id="v-ribCount" class="val-badge">24</span></div>
+        <input type="range" id="ribCount" min="0" max="80" step="1" value="24">
+      </div>
+
+      <div class="control-group">
+        <div class="control-header"><label>Rib Depth</label><span id="v-ribDepth" class="val-badge">4.5 mm</span></div>
+        <input type="range" id="ribDepth" min="0" max="15" step="0.5" value="4.5">
+      </div>
+
+      <div class="control-group">
+        <div class="control-header"><label>Helical Twist</label><span id="v-twist" class="val-badge">120°</span></div>
+        <input type="range" id="twist" min="-360" max="360" step="5" value="120">
+      </div>
+
+      <!-- Print Mode & Fittings -->
+      <div class="section-title">4. 3D Print & Socket Setup</div>
+
+      <div class="control-group">
+        <div class="control-header"><label>Print Mode</label></div>
+        <select id="printMode">
+          <option value="hollow">Hollow Shell (With Socket Fitter)</option>
+          <option value="vase">Solid Block (For Slicer Vase Mode)</option>
+        </select>
+      </div>
+
+      <div class="control-group" id="wallGroup">
+        <div class="control-header"><label>Wall Thickness</label><span id="v-wall" class="val-badge">1.6 mm</span></div>
+        <input type="range" id="wall" min="0.8" max="4.0" step="0.2" value="1.6">
+      </div>
+
+      <div class="control-group" id="socketGroup">
+        <div class="control-header"><label>Base Socket Fitter</label></div>
+        <select id="socketType">
+          <option value="40">E27 Standard Ring (40mm ID)</option>
+          <option value="28">E14 Small Ring (28mm ID)</option>
+          <option value="42">US Uno / IKEA Cord (42mm ID)</option>
+          <option value="0">No Fitter (Open Cylinder)</option>
+        </select>
+      </div>
+    </div>
+
+    <footer>
+      <div class="stats" id="meshStats">Generating geometry...</div>
+      <button class="btn" id="exportBtn">Download 3D Printable .STL</button>
+    </footer>
+  </aside>
+
+  <main id="viewport">
+    <div id="overlay">
+      <div class="toggle-row" style="gap: 12px;">
+        <label for="bulbToggle">Test Warm LED Bulb Glow</label>
+        <input type="checkbox" id="bulbToggle" checked>
+      </div>
+      <div class="toggle-row" style="gap: 12px;">
+        <label for="wireToggle">Show Wireframe</label>
+        <input type="checkbox" id="wireToggle">
+      </div>
+    </div>
+  </main>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { STLExporter } from 'three/addons/exporters/STLExporter.js';
+
+    // --- Scene Setup ---
+    const viewport = document.getElementById('viewport');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x121316);
+
+    const camera = new THREE.PerspectiveCamera(45, viewport.clientWidth / viewport.clientHeight, 1, 2000);
+    camera.position.set(0, 160, 360);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(viewport.clientWidth, viewport.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    viewport.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 90, 0);
+    controls.enableDamping = true;
+
+    // --- Grid (250x250mm Print Bed) ---
+    const bedSize = 250;
+    const grid = new THREE.GridHelper(bedSize, 25, 0xf59e0b, 0x2e313a);
+    scene.add(grid);
+
+    // --- Lighting ---
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
+    dirLight.position.set(150, 300, 200);
+    scene.add(dirLight);
+
+    // Internal Lamp Bulb Simulator
+    const bulbLight = new THREE.PointLight(0xff9d3b, 4.5, 450, 1.2);
+    bulbLight.position.set(0, 85, 0);
+    scene.add(bulbLight);
+
+    const bulbGeo = new THREE.SphereGeometry(14, 16, 16);
+    const bulbMat = new THREE.MeshBasicMaterial({ color: 0xffcf70 });
+    const bulbMesh = new THREE.Mesh(bulbGeo, bulbMat);
+    bulbMesh.position.copy(bulbLight.position);
+    scene.add(bulbMesh);
+
+    // --- Shade Material ---
+    const shadeMaterial = new THREE.MeshPhysicalMaterial({
+      color: 0xfffaf0,
+      emissive: 0xff7b00,
+      emissiveIntensity: 0.18,
+      roughness: 0.35,
+      metalness: 0.0,
+      transmission: 0.35,
+      thickness: 2.0,
+      side: THREE.DoubleSide
+    });
+
+    let shadeMesh = null;
+
+    // --- Parametric Math Helper ---
+    function getOuterRadius(v, u, params) {
+      const { rBot, rTop, curveAmp, profileType, waveStyle, ribCount, ribDepth, twist } = params;
+      
+      // 1. Base interpolation
+      let r = rBot * (1 - v) + rTop * v;
+
+      // 2. Profile curve offset
+      if (profileType === 'bulge') {
+        r += curveAmp * Math.sin(v * Math.PI);
+      } else if (profileType === 'bell') {
+        r += curveAmp * Math.sin(v * Math.PI * 2);
+      } else if (profileType === 'hourglass') {
+        r -= curveAmp * Math.sin(v * Math.PI);
+      } else if (profileType === 'teardrop') {
+        r += curveAmp * Math.sin(Math.pow(v, 0.65) * Math.PI);
+      }
+
+      // 3. Surface Ribs & Helical Twist
+      if (ribCount > 0 && ribDepth > 0) {
+        const twistRad = (twist * Math.PI) / 180;
+        const angle = u * Math.PI * 2 * ribCount + v * twistRad * (ribCount / 6);
+
+        let wave = 0;
+        if (waveStyle === 'sine') {
+          wave = Math.sin(angle);
+        } else if (waveStyle === 'pleated') {
+          wave = (2 / Math.PI) * Math.asin(Math.sin(angle)); // Triangle wave
+        } else if (waveStyle === 'knurled') {
+          const angleReverse = u * Math.PI * 2 * ribCount - v * twistRad * (ribCount / 6);
+          wave = 0.5 * (Math.sin(angle) + Math.sin(angleReverse));
+        }
+
+        r += ribDepth * wave;
+      }
+
+      return Math.max(8, r);
+    }
+
+    // --- Watertight Manifold Mesh Builder ---
+    function buildLampGeometry(params) {
+      const radialSegs = 180;
+      const heightSegs = 100;
+      const { height, wall, printMode, socketRadius } = params;
+
+      const positions = [];
+      const indices = [];
+
+      const addVertex = (x, y, z) => {
+        positions.push(x, y, z);
+        return (positions.length / 3) - 1;
+      };
+
+      const outerGrid = [];
+      const innerGrid = [];
+
+      // Generate outer surface vertices
+      for (let iv = 0; iv <= heightSegs; iv++) {
+        const v = iv / heightSegs;
+        const y = v * height;
+        const row = [];
+        for (let iu = 0; iu < radialSegs; iu++) {
+          const u = iu / radialSegs;
+          const theta = u * Math.PI * 2;
+          const r = getOuterRadius(v, u, params);
+          row.push(addVertex(r * Math.cos(theta), y, r * Math.sin(theta)));
+        }
+        outerGrid.push(row);
+      }
+
+      // Outer Wall Faces
+      for (let iv = 0; iv < heightSegs; iv++) {
+        for (let iu = 0; iu < radialSegs; iu++) {
+          const nextU = (iu + 1) % radialSegs;
+          const a = outerGrid[iv][iu];
+          const b = outerGrid[iv][nextU];
+          const c = outerGrid[iv + 1][iu];
+          const d = outerGrid[iv + 1][nextU];
+          indices.push(a, c, b);
+          indices.push(b, c, d);
+        }
+      }
+
+      if (printMode === 'vase') {
+        // Solid Watertight Block for Slicer "Vase Mode"
+        const botCenter = addVertex(0, 0, 0);
+        const topCenter = addVertex(0, height, 0);
+
+        for (let iu = 0; iu < radialSegs; iu++) {
+          const nextU = (iu + 1) % radialSegs;
+          indices.push(botCenter, outerGrid[0][ iu ], outerGrid[0][nextU]);
+          indices.push(topCenter, outerGrid[heightSegs][nextU], outerGrid[heightSegs][iu]);
+        }
+      } else {
+        // Hollow Manifold Shell Mode
+        for (let iv = 0; iv <= heightSegs; iv++) {
+          const v = iv / heightSegs;
+          const y = v * height;
+          const row = [];
+          for (let iu = 0; iu < radialSegs; iu++) {
+            const u = iu / radialSegs;
+            const theta = u * Math.PI * 2;
+            const r = Math.max(4, getOuterRadius(v, u, params) - wall);
+            row.push(addVertex(r * Math.cos(theta), y, r * Math.sin(theta)));
+          }
+          innerGrid.push(row);
+        }
+
+        // Inner Wall Faces (inverted winding)
+        for (let iv = 0; iv < heightSegs; iv++) {
+          for (let iu = 0; iu < radialSegs; iu++) {
+            const nextU = (iu + 1) % radialSegs;
+            const a = innerGrid[iv][iu];
+            const b = innerGrid[iv][nextU];
+            const c = innerGrid[iv + 1][iu];
+            const d = innerGrid[iv + 1][nextU];
+            indices.push(a, b, c);
+            indices.push(b, d, c);
+          }
+        }
+
+        // Stitch Top Rim
+        for (let iu = 0; iu < radialSegs; iu++) {
+          const nextU = (iu + 1) % radialSegs;
+          const o1 = outerGrid[heightSegs][iu];
+          const o2 = outerGrid[heightSegs][nextU];
+          const i1 = innerGrid[heightSegs][iu];
+          const i2 = innerGrid[heightSegs][nextU];
+          indices.push(o1, i1, o2);
+          indices.push(o2, i1, i2);
+        }
+
+        // Stitch Bottom Rim
+        for (let iu = 0; iu < radialSegs; iu++) {
+          const nextU = (iu + 1) % radialSegs;
+          const o1 = outerGrid[0][iu];
+          const o2 = outerGrid[0][nextU];
+          const i1 = innerGrid[0][iu];
+          const i2 = innerGrid[0][nextU];
+          indices.push(o1, o2, i1);
+          indices.push(o2, i2, i1);
+        }
+      }
+
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geo.setIndex(indices);
+      geo.computeVertexNormals();
+      return geo;
+    }
+
+    // --- Socket Fitter Ring + Spider Spokes Generator ---
+    function createFitterGroup(params) {
+      const group = new THREE.Group();
+      const { socketRadius, rBot, wall } = params;
+      if (params.printMode === 'vase' || socketRadius <= 0) return group;
+
+      const ringHeight = 8;
+      const ringWall = 4.5;
+      const innerR = socketRadius;
+      const outerR = innerR + ringWall;
+
+      // Build Collar Ring via Extrude
+      const shape = new THREE.Shape();
+      shape.absarc(0, 0, outerR, 0, Math.PI * 2, false);
+      const hole = new THREE.Path();
+      hole.absarc(0, 0, innerR, 0, Math.PI * 2, true);
+      shape.holes.push(hole);
+
+      const ringGeo = new THREE.ExtrudeGeometry(shape, { depth: ringHeight, bevelEnabled: false, curveSegments: 64 });
+      ringGeo.rotateX(-Math.PI / 2);
+      const ringMesh = new THREE.Mesh(ringGeo, shadeMaterial);
+      group.add(ringMesh);
+
+      // 3 Spider Spokes connecting ring to outer shade wall
+      const spokeLength = Math.max(5, (rBot - wall) - outerR + 3);
+      if (spokeLength > 5) {
+        for (let i = 0; i < 3; i++) {
+          const angle = (i * Math.PI * 2) / 3;
+          const spokeGeo = new THREE.BoxGeometry(spokeLength, ringHeight, 6);
+          spokeGeo.translate(outerR + spokeLength / 2 - 1.5, ringHeight / 2, 0);
+          spokeGeo.rotateY(angle);
+          const spokeMesh = new THREE.Mesh(spokeGeo, shadeMaterial);
+          group.add(spokeMesh);
+        }
+      }
+      return group;
+    }
+
+    // --- State & Update Loop ---
+    function getParams() {
+      return {
+        height: parseFloat(document.getElementById('height').value),
+        rBot: parseFloat(document.getElementById('rBot').value),
+        rTop: parseFloat(document.getElementById('rTop').value),
+        profileType: document.getElementById('profileType').value,
+        curveAmp: parseFloat(document.getElementById('curveAmp').value),
+        waveStyle: document.getElementById('waveStyle').value,
+        ribCount: parseInt(document.getElementById('ribCount').value, 10),
+        ribDepth: parseFloat(document.getElementById('ribDepth').value),
+        twist: parseFloat(document.getElementById('twist').value),
+        printMode: document.getElementById('printMode').value,
+        wall: parseFloat(document.getElementById('wall').value),
+        socketRadius: parseFloat(document.getElementById('socketType').value) / 2
+      };
+    }
+
+    function updateModel() {
+      const p = getParams();
+
+      // Update UI Badges
+      document.getElementById('v-height').textContent = `${p.height} mm`;
+      document.getElementById('v-rBot').textContent = `${p.rBot} mm`;
+      document.getElementById('v-rTop').textContent = `${p.rTop} mm`;
+      document.getElementById('v-curveAmp').textContent = `${p.curveAmp} mm`;
+      document.getElementById('v-ribCount').textContent = p.ribCount;
+      document.getElementById('v-ribDepth').textContent = `${p.ribDepth} mm`;
+      document.getElementById('v-twist').textContent = `${p.twist}°`;
+      document.getElementById('v-wall').textContent = `${p.wall} mm`;
+
+      // Toggle UI visibility based on print mode
+      const isHollow = p.printMode === 'hollow';
+      document.getElementById('wallGroup').style.display = isHollow ? 'flex' : 'none';
+      document.getElementById('socketGroup').style.display = isHollow ? 'flex' : 'none';
+
+      // Clear previous mesh
+      if (shadeMesh) {
+        scene.remove(shadeMesh);
+        shadeMesh.traverse(child => { if (child.geometry) child.geometry.dispose(); });
+      }
+
+      shadeMesh = new THREE.Group();
+      const mainGeo = buildLampGeometry(p);
+      const mainPart = new THREE.Mesh(mainGeo, shadeMaterial);
+      shadeMesh.add(mainPart);
+
+      const fitterGroup = createFitterGroup(p);
+      shadeMesh.add(fitterGroup);
+
+      scene.add(shadeMesh);
+
+      // Center internal bulb at 45% height
+      bulbLight.posit
